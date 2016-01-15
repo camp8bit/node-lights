@@ -11,12 +11,12 @@ module.exports = function (h) {
   var Green = utils.intColor(Color('#00ff00'))
   var Black = utils.intColor(Color('#000000'))
   var x = 0
-  var length = 20
+  var length = 15
 
   return function (beat, step, pixelData) {
     var h = pixelData.length
 
-    x += 0.02
+    x += 0.1
 
     var o = Math.floor((Math.sin(x) / 2 + 0.5) * length)
 
