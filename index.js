@@ -1,19 +1,19 @@
-var udp = require('dgram')
-var osc = require('osc-min')
-var ws281x = require('rpi-ws281x-native')
-var Color = require('color')
+var udp = require('dgram');
+var osc = require('osc-min');
+var ws281x = require('rpi-ws281x-native');
+var Color = require('color');
 
 var NUM_LEDS = parseInt(process.argv[2], 10) || (59 + 59 + 25 + 25) // 60 * 5
-var pixelData = new Uint32Array(NUM_LEDS)
-var inport
+var pixelData = new Uint32Array(NUM_LEDS);
+var inport;
 
 if (process.argv[2]) {
-  inport = parseInt(process.argv[2], 10)
+  inport = parseInt(process.argv[2], 10);
 } else {
-  inport = 8000
+  inport = 8000;
 }
 
-ws281x.init(NUM_LEDS)
+ws281x.init(NUM_LEDS);
 
 // ---- trap the SIGINT and reset before exit
 process.on('SIGINT', function () {
@@ -23,31 +23,11 @@ process.on('SIGINT', function () {
 
 console.log('Press <ctrl>+C to exit.');
 
-// rainbow-colors, taken from http://goo.gl/Cs3H0v
-function colorwheel(pos) {
-  pos = 255 - pos;
-  if (pos < 85) { return rgb2Int(255 - pos * 3, 0, pos * 3); }
-  else if (pos < 170) { pos -= 85; return rgb2Int(0, pos * 3, 255 - pos * 3); }
-  else { pos -= 170; return rgb2Int(pos * 3, 255 - pos * 3, 0); }
-}
-
-function rgb2Int (r, g, b) {
-  r /= 2;
-  g /= 2;
-  b /= 2;
-
-  return ((r & 0xff) << 16) + ((g & 0xff) << 8) + (b & 0xff);
-}
-
-function intColor (color) {
-  return rgb2Int(color.red(), color.green(), color.blue())
-}
-
 var addresses = {
   tapBeat: '/2/push13', // '/1/tap',
   mode: '/2/push14', // 1/mode',
   xyPad: '/1/xypad'
-}
+};
 
 function getTime () {
   var t = process.hrtime()
@@ -70,7 +50,7 @@ var state = {
       this.tapCount = 0
     } else {
       this.lastTap = t
-      this.tapCount++
+      this.tapCount++;
     }
 
 
