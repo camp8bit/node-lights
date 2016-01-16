@@ -13,4 +13,6 @@ module.exports = function (pos) {
     pos -= 170;
     return rgbToInt(pos * 3, 255 - pos * 3, 0);
   }
+
+  throw 'Invalid pos ' + pos;
 };

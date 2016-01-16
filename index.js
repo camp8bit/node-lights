@@ -1,6 +1,20 @@
 var udp = require('dgram');
 var osc = require('osc-min');
-var ws281x = require('rpi-ws281x-native');
+var colorwheel = require('./colorwheel');
+var ws281x;
+
+if (process.getuid() === 0) {
+  ws281x = require('rpi-ws281x-native');
+} else {
+  console.log('Warning running in test mode with no ws281x enabled.');
+
+  ws281x = {
+    init: function () {},
+    reset: function () {},
+    render: function () {}
+  };
+}
+
 var Panel = require('./panel');
 var config = require('./config');
 
@@ -10,9 +24,12 @@ var inport;
 
 var PANEL_LENGTH = 34;
 
-// Sams beat patterns. The first four digits control what panel is pulsing
+// Patterns of beams to turn on.  It's a bitmask:
+// Bits 1-4 (least-significant) each reference a beam
+// Bits 5-6 reference a pattern number (0,1,2,3) so you can have up to 4 different colour patterns in a sequence
 
 var beatPatterns = [
+  ['000001', '000010', '000100', '001000', '000001', '000010', '000100', '001000'],
   ['000001', '000010', '000100', '001000', '000001', '000010', '000100', '001000'],
   ['000001', '011010', '000010', '010101', '000100', '011010', '001000', '010101'],
   ['000001', '000011', '000111', '001111', '011000', '011100', '011110', '011111'],
@@ -59,7 +76,9 @@ function State () {
   this.bpm = 120;
 
   this.beatPattern = beatPatterns[0];
+  this.mode = 0;
 
+  this.lastBeat = 0;
   this.beat = 0;
   this.step = 0;
 };
@@ -84,7 +103,35 @@ State.prototype.tap = function () {
     var secondsPerBeat = (this.lastTap - this.firstTap) / parseFloat(this.tapCount);
     this.bpm = 1.0 / (secondsPerBeat / 60.0);
     console.log(this.bpm);
+
+    this.barChanged();
   }
+};
+
+State.prototype.nextMode = function () {
+  this.mode = (this.mode + 1) % Panel.modes.length;
+};
+
+State.prototype.getModeName = function () {
+  return Panel.modes[this.mode];
+};
+
+State.prototype.randomColor = function () {
+  return colorwheel(Math.floor(Math.random() * 255));
+};
+
+State.prototype.beatChanged = function () {
+  var c = this.randomColor();
+
+  this.panels.forEach(function (p) {
+    p.color = c;
+  });
+};
+
+State.prototype.barChanged = function () {
+  var i = Math.min(beatPatterns.length - 1, Math.floor(Math.random() * beatPatterns.length));
+  this.beatPattern = beatPatterns[i];
+  console.log('bar changed');
 };
 
 State.prototype.update = function (t) {
@@ -92,13 +139,23 @@ State.prototype.update = function (t) {
   var dBeats = dT / (60 / this.bpm);
   var beat = dBeats % config.beatsPerBar;
   this.step = Math.floor(beat * config.stepsPerBeat) % config.stepsPerBeat;
-  this.beat = Math.floor(beat);
+  beat = Math.floor(beat);
+
+  if (beat !== this.beat) {
+    this.beatChanged();
+
+    if (beat === 0) {
+      this.barChanged();
+    }
+  }
+
+  this.beat = beat;
 };
 
 State.prototype.getActivePanels = function () {
   var self = this;
   var result = [];
-  var beatPattern = this.beatPattern[this.beat].slice(0, this.panels.length).split('');
+  var beatPattern = this.beatPattern[this.beat].slice(2, this.panels.length + 2).split('');
 
   for (var i = 0; i < this.panels.length; i++) {
     if (beatPattern[i] === '1') {
@@ -121,16 +178,18 @@ state.panels = [
 setInterval(function () {
   state.update(getTime());
 
+  // console.log('\n\n>> New frame\n\n');
+
   state.panels.forEach(function (panel) {
     panel.clear();
   });
 
   state.getActivePanels().forEach(function (panel) {
-    panel.wipeUp();
+    panel[state.getModeName()].apply(panel, [state.beat, state.step]);
   });
 
   ws281x.render(pixelData);
-}, 10);
+}, 1000 / 60);
 
 var sock = udp.createSocket('udp4', function (msg, rinfo) {
   var message;
@@ -156,6 +215,7 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
   }
 
   if (push && (message.address === addresses.mode)) {
+    state.nextMode();
     // state.mode = (state.mode + 1) % modes.length;
   }
 
