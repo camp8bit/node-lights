@@ -1,5 +1,5 @@
 module.exports = {
   stepsPerBeat: 64,
-  beatsPerBar: 4,
+  beatsPerBar: 8,
   globalBrightness: 0.5
 };

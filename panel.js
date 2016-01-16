@@ -37,43 +37,31 @@ Panel.prototype.fill = function (a, b, color) {
 };
 
 Panel.prototype.wipeUp = function (beat, step) {
-  this.clear();
-
   var length = this.length / config.stepsPerBeat * step;
   this.fill(0, length, this.color);
 };
 
 Panel.prototype.wipeDown = function (beat, step) {
-  this.clear();
-
   var length = this.length / config.stepsPerBeat * step;
   this.fill(length, this.length, this.color);
 };
 
 Panel.prototype.wipeIn = function (beat, step) {
-  this.clear();
-
   var length = this.length / config.stepsPerBeat * step / 2;
   this.fill(length, this.length - length, this.color);
 };
 
 Panel.prototype.wipeOut = function (beat, step) {
-  this.clear();
-
   var length = this.length / config.stepsPerBeat * (config.stepsPerBeat - step) / 2;
   this.fill(length, this.length - length, this.color);
 };
 
 Panel.prototype.pulseUp = function (beat, step) {
-  this.clear();
-
   var length = this.length / config.stepsPerBeat * step;
   this.pixels.fill(length, length + PULSE_LENGTH, this.color);
 };
 
 Panel.prototype.pulseDown = function (beat, step) {
-  this.clear();
-
   var length = this.length / config.stepsPerBeat * (config.stepsPerBeat - step);
   this.pixels.fill(length, length + PULSE_LENGTH, this.color);
 };

@@ -1,11 +1,25 @@
 var udp = require('dgram');
 var osc = require('osc-min');
 var ws281x = require('rpi-ws281x-native');
-var Color = require('color');
+var Panel = require('./panel');
+var config = require('./config');
 
-var NUM_LEDS = parseInt(process.argv[2], 10) || (59 + 59 + 25 + 25) // 60 * 5
+var NUM_LEDS = parseInt(process.argv[2], 10) || (59 + 59 + 25 + 25); // 60 * 5
 var pixelData = new Uint32Array(NUM_LEDS);
 var inport;
+
+var PANEL_LENGTH = 34;
+
+// Sams beat patterns. The first four digits control what panel is pulsing
+
+var beatPatterns = [
+  ['000001', '000010', '000100', '001000', '000001', '000010', '000100', '001000'],
+  ['000001', '011010', '000010', '010101', '000100', '011010', '001000', '010101'],
+  ['000001', '000011', '000111', '001111', '011000', '011100', '011110', '011111'],
+  ['000011', '001100', '000011', '001100', '010110', '011001', '010110', '011001'],
+  ['001111', '001111', '011111', '011111', '101111', '101111', '111111', '111111'],
+  ['000001', '010010', '100100', '111000', '000001', '010010', '100100', '111000']
+];
 
 if (process.argv[2]) {
   inport = parseInt(process.argv[2], 10);
@@ -30,161 +44,132 @@ var addresses = {
 };
 
 function getTime () {
-  var t = process.hrtime()
-  return t[0] + t[1] / 1e9
+  var t = process.hrtime();
+  return t[0] + t[1] / 1e9;
 }
 
 var RESET_TIME = 2.0;
 
-var state = {
-  x: 0.5,
-  y: 1,
-  mode: 0,
-  lastTap: 0,
-  tap: function () {
-    var t = getTime()
+var state = new State();
 
-    if (t - this.lastTap > RESET_TIME) {
-      this.firstTap = t
-      this.lastTap = t
-      this.tapCount = 0
-    } else {
-      this.lastTap = t
-      this.tapCount++;
-    }
+function State () {
+  this.firstTap = 0;
+  this.lastTap = 0;
+  this.tapCount = 0;
+  this.bpm = 120;
 
+  this.beatPattern = beatPatterns[0];
 
-    if (this.tapCount > 1) {
-      console.log(this.firstTap)
-      console.log(this.lastTap)
-      console.log(this.tapCount)
-      var secondsPerBeat = (this.lastTap - this.firstTap) / parseFloat(this.tapCount)
-      this.bpm = 1.0 / (secondsPerBeat / 60.0)
-      console.log(this.bpm)
-    }
-  },
-  bpm: 120
-}
+  this.beat = 0;
+  this.step = 0;
+};
 
-var modes = [
-  require('./modes/wipe')(NUM_LEDS),
-  require('./modes/lazers')(NUM_LEDS),
-  require('./modes/white')(NUM_LEDS),
-  require('./modes/plasma')(NUM_LEDS),
-  require('./modes/fire')(NUM_LEDS),
-  require('./modes/chaser')(NUM_LEDS),
-]
-
-var stepsPerBeat = 64;
-var beatsPerBar = 4;
-
-var pattern = [
-    Color('#aaaaaa'),
-    Color('#000000'),
-    Color('#000000'),
-    Color('#000000'),
-    Color('#ff0000'),
-    Color('#000000'),
-    Color('#000000'),
-    Color('#000000'),
-    Color('#ff0000'),
-    Color('#000000'),
-    Color('#000000'),
-    Color('#000000'),
-    Color('#ff0000'),
-    Color('#000000'),
-    Color('#000000'),
-    Color('#000000')
-  ];
-
-// ---- animation-loop
-setInterval(function () {
+State.prototype.tap = function () {
   var t = getTime();
-  var dT = t - state.lastTap;
-  var dBeats = dT / (60 / state.bpm);
-  var beat = dBeats % beatsPerBar;
-  var step = Math.floor(beat * stepsPerBeat) % stepsPerBeat;
-  beat = Math.floor(beat);
 
-  // console.log(beat, step)
-
-  var color = Color('#000000');
-
-  // if (step % 2 === 0) {
-  //   color = Color('#000055')
-  // }
-
-  // if (step === 0) {
-  //   color = pattern[beat]
-  // }
-
-  // if (step % 2 === 0) {
-  //   color = pattern[beat * 4 + step / 2]
-  // }
-
-  // if (step === 2) {
-  //   color = pattern[beat].darken(0.8)
-  // }
-
-  // var i
-  // var c = intColor(color)
-
-  for (i = 0; i < NUM_LEDS; i++) {
-    pixelData[i] = 0;
+  if (t - this.lastTap > RESET_TIME) {
+    this.firstTap = t;
+    this.lastTap = t;
+    this.tapCount = 0;
+  } else {
+    this.lastTap = t;
+    this.tapCount++;
   }
 
-  modes[state.mode](beat, step, pixelData);
-  if (step % 2 === 0) {
+  if (this.tapCount > 1) {
+    // console.log(this.firstTap);
+    // console.log(this.lastTap);
+    // console.log(this.tapCount);
+
+    var secondsPerBeat = (this.lastTap - this.firstTap) / parseFloat(this.tapCount);
+    this.bpm = 1.0 / (secondsPerBeat / 60.0);
+    console.log(this.bpm);
+  }
+};
+
+State.prototype.update = function (t) {
+  var dT = t - this.lastTap;
+  var dBeats = dT / (60 / this.bpm);
+  var beat = dBeats % config.beatsPerBar;
+  this.step = Math.floor(beat * config.stepsPerBeat) % config.stepsPerBeat;
+  this.beat = Math.floor(beat);
+};
+
+State.prototype.getActivePanels = function () {
+  var self = this;
+  var result = [];
+  var beatPattern = this.beatPattern[this.beat].slice(0, this.panels.length).split('');
+
+  for (var i = 0; i < this.panels.length; i++) {
+    if (beatPattern[i] === '1') {
+      result.push(self.panels[i]);
+    }
   }
 
-  // if (beat) {
-  //   for (i = 0; i < NUM_LEDS * state.x; i++) {
-  //     pixelData[i] = rgb2Int(state.y * 255, 0, state.y * 255)
-  //   }
-  // }
-  // offset = (offset + 8) % 256;
+  return result;
+};
+
+var state = new State();
+
+state.panels = [
+  new Panel(pixelData, PANEL_LENGTH * 0, PANEL_LENGTH * 1 - 1),
+  new Panel(pixelData, PANEL_LENGTH * 1, PANEL_LENGTH * 2 - 1),
+  new Panel(pixelData, PANEL_LENGTH * 2, PANEL_LENGTH * 3 - 1),
+  new Panel(pixelData, PANEL_LENGTH * 3, PANEL_LENGTH * 4 - 1)
+];
+
+setInterval(function () {
+  state.update(getTime());
+
+  state.panels.forEach(function (panel) {
+    panel.clear();
+  });
+
+  state.getActivePanels().forEach(function (panel) {
+    panel.wipeUp();
+  });
 
   ws281x.render(pixelData);
-}, 10) //1000 * 60 / state.bpm / stepsPerBeat / 2)
+}, 10);
 
 var sock = udp.createSocket('udp4', function (msg, rinfo) {
-  var message
+  var message;
 
   try {
-    message = osc.fromBuffer(msg)
+    message = osc.fromBuffer(msg);
   } catch (_error) {
-    console.log('invalid OSC packet')
-    return
+    console.log('invalid OSC packet');
+    return;
   }
 
-  console.log(JSON.stringify(message))
+  console.log(JSON.stringify(message));
 
-  var push = message.args && message.args[0] && message.args[0].value === 1
+  var push = message.args && message.args[0] && message.args[0].value === 1;
 
   if (push && (message.address === addresses.tapBeat)) {
-    state.tap()
+    state.tap();
   }
 
   if (message.address === addresses.xyPad) {
-    state.x = message.args[0].value
-    state.y = message.args[1].value
+    state.x = message.args[0].value;
+    state.y = message.args[1].value;
   }
 
   if (push && (message.address === addresses.mode)) {
-    state.mode = (state.mode + 1) % modes.length;
+    // state.mode = (state.mode + 1) % modes.length;
   }
 
   if (message.address.match('/2/stepSequencer')) {
-    var x = message.address.split('/')[3] - 1
-    var y = message.address.split('/')[4] - 1
-    var v = message.args[0].value
-    
-    console.log(x, v)
+    var x = message.address.split('/')[3] - 1;
+    // var y = message.address.split('/')[4] - 1;
+    var v = message.args[0].value;
 
-    pattern[x] = v ? Color('#ff0000') : Color('#000000')
+    console.log(x, v);
+
+    // pattern[x] = v ? Color('#ff0000') : Color('#000000');
   }
-})
+});
 
-sock.bind(inport)
+sock.bind(inport);
 
-console.log('hmm?')
+console.log('hmm?');
