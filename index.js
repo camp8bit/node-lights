@@ -22,7 +22,7 @@ var NUM_LEDS = parseInt(process.argv[2], 10) || (59 + 59 + 25 + 25); // 60 * 5
 var pixelData = new Uint32Array(NUM_LEDS);
 var inport;
 
-var PANEL_LENGTH = 34;
+var PANEL_LENGTH = 44;
 
 // Patterns of beams to turn on.  It's a bitmask:
 // Bits 1-4 (least-significant) each reference a beam
@@ -76,7 +76,7 @@ function State () {
   this.bpm = 120;
 
   this.beatPattern = beatPatterns[0];
-  this.mode = 0;
+  this.mode = 3;
 
   this.lastBeat = 0;
   this.beat = 0;
@@ -189,7 +189,7 @@ setInterval(function () {
   });
 
   ws281x.render(pixelData);
-}, 1000 / 60);
+}, 1000 / 100);
 
 var sock = udp.createSocket('udp4', function (msg, rinfo) {
   var message;
