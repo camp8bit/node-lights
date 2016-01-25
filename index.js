@@ -1,6 +1,7 @@
 var udp = require('dgram');
 var osc = require('osc-min');
 var colorwheel = require('./colorwheel');
+var Color = require('color');
 var ws281x;
 
 if (process.getuid() === 0) {
@@ -14,6 +15,14 @@ if (process.getuid() === 0) {
     render: function () {}
   };
 }
+
+var addresses = {
+  tapBeat: '/toggleA_1',
+  mode: '/2/push14', // 1/mode',
+  xyPad: '/1/xypad',
+  hue: '/3/xyM_r',
+  modeSlider: '/3/xyM_l'
+};
 
 var Panel = require('./panel');
 var config = require('./config');
@@ -54,12 +63,6 @@ process.on('SIGINT', function () {
 
 console.log('Press <ctrl>+C to exit.');
 
-var addresses = {
-  tapBeat: '/2/push13', // '/1/tap',
-  mode: '/2/push14', // 1/mode',
-  xyPad: '/1/xypad'
-};
-
 function getTime () {
   var t = process.hrtime();
   return t[0] + t[1] / 1e9;
@@ -77,6 +80,8 @@ function State () {
 
   this.beatPattern = beatPatterns[0];
   this.mode = 3;
+  this.hue = 0;
+  this.brightness = 1.0;
 
   this.lastBeat = 0;
   this.beat = 0;
@@ -182,6 +187,8 @@ setInterval(function () {
 
   state.panels.forEach(function (panel) {
     panel.clear();
+
+    panel.color = Color().hsv(state.hue * 255, 255, state.brightness * 255);
   });
 
   state.getActivePanels().forEach(function (panel) {
@@ -189,7 +196,7 @@ setInterval(function () {
   });
 
   ws281x.render(pixelData);
-}, 1000 / 100);
+}, 20);
 
 var sock = udp.createSocket('udp4', function (msg, rinfo) {
   var message;
@@ -205,7 +212,7 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
 
   var push = message.args && message.args[0] && message.args[0].value === 1;
 
-  if (push && (message.address === addresses.tapBeat)) {
+  if (message.address === addresses.tapBeat) {
     state.tap();
   }
 
@@ -217,6 +224,15 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
   if (push && (message.address === addresses.mode)) {
     state.nextMode();
     // state.mode = (state.mode + 1) % modes.length;
+  }
+
+  if (message.address === addresses.modeSlider) {
+    state.mode = Math.floor(Panel.modes.length * message.args[1].value);
+  }
+
+  if (message.address === addresses.hue) {
+    state.hue = message.args[1].value;
+    state.brightness = message.args[0].value;
   }
 
   if (message.address.match('/2/stepSequencer')) {
@@ -231,5 +247,3 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
 });
 
 sock.bind(inport);
-
-console.log('hmm?');
