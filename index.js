@@ -15,6 +15,14 @@ if (process.getuid() === 0) {
   };
 }
 
+var addresses = {
+  tap: '/tap',
+  mode: '/modes',
+  hue: '/hue',
+  brightness: '/brightness',
+  all: '/all'
+};
+
 var Panel = require('./panel');
 var config = require('./config');
 
@@ -54,12 +62,6 @@ process.on('SIGINT', function () {
 
 console.log('Press <ctrl>+C to exit.');
 
-var addresses = {
-  tapBeat: '/2/push13', // '/1/tap',
-  mode: '/2/push14', // 1/mode',
-  xyPad: '/1/xypad'
-};
-
 function getTime () {
   var t = process.hrtime();
   return t[0] + t[1] / 1e9;
@@ -77,6 +79,7 @@ function State () {
 
   this.beatPattern = beatPatterns[0];
   this.mode = 3;
+  this.all = false;
 
   this.lastBeat = 0;
   this.beat = 0;
@@ -101,7 +104,7 @@ State.prototype.tap = function () {
     // console.log(this.tapCount);
 
     var secondsPerBeat = (this.lastTap - this.firstTap) / parseFloat(this.tapCount);
-    this.bpm = 1.0 / (secondsPerBeat / 60.0);
+    this.bpm = Math.round(1.0 / (secondsPerBeat / 60.0));
     console.log(this.bpm);
 
     this.barChanged();
@@ -113,7 +116,7 @@ State.prototype.nextMode = function () {
 };
 
 State.prototype.getModeName = function () {
-  return Panel.modes[this.mode];
+  return Panel.modes[this.mode] || 'pulseUp';
 };
 
 State.prototype.randomColor = function () {
@@ -201,32 +204,31 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
     return;
   }
 
-  console.log(JSON.stringify(message));
+  //console.log(JSON.stringify(message));
 
   var push = message.args && message.args[0] && message.args[0].value === 1;
 
-  if (push && (message.address === addresses.tapBeat)) {
+  if (push && (message.address === addresses.tap)) {
     state.tap();
   }
 
-  if (message.address === addresses.xyPad) {
-    state.x = message.args[0].value;
-    state.y = message.args[1].value;
+  if (message.address === addresses.all) {
+    state.all = message.args[0].value === 1;
   }
 
-  if (push && (message.address === addresses.mode)) {
-    state.nextMode();
-    // state.mode = (state.mode + 1) % modes.length;
+  if (message.address === addresses.hue) {
+    state.hue = message.args[0].value;
   }
 
-  if (message.address.match('/2/stepSequencer')) {
+  if (message.address === addresses.brightness) {
+    state.brightness = message.args[0].value;
+  }
+
+  if ((push) && (message.address.match('/modes'))) {
+    var y = message.address.split('/')[2] - 1;
     var x = message.address.split('/')[3] - 1;
-    // var y = message.address.split('/')[4] - 1;
-    var v = message.args[0].value;
-
-    console.log(x, v);
-
-    // pattern[x] = v ? Color('#ff0000') : Color('#000000');
+    var i = y * 3 + x;
+    state.mode = i;
   }
 });
 
