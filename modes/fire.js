@@ -1,12 +1,17 @@
 var utils = require('../utilities');
 var Gradient = require('gradient/lib/gradient.js');
+var config = require('../config');
+
+function intColor (color) {
+  return utils.rgb2Int(color.red() * config.globalBrightness, color.green() * config.globalBrightness, color.blue() * config.globalBrightness);
+}
 
 module.exports = function (panel, colors) {
   var h = panel.length;
   var buffer = new Array(panel.length);
   var gradient = Gradient(colors, panel.length);
-  var palette = gradient.toArray().map(function (c) {
-    return utils.intColor(c);
+  var palette = gradient.toArray().map(function (f) {
+    return f;
   }).reverse();
 
   var i, j;
@@ -25,8 +30,10 @@ module.exports = function (panel, colors) {
     // Base burning
     buffer[0] = Math.random() * 0.5 + 0.5;
 
+    var c;
     for (i = 0; i < h; i++) {
-      panel.pixelData[i + panel.start] = palette[Math.floor(buffer[i] * h)];
+      c = palette[Math.floor(buffer[i] * h)];
+      panel.pixelData[i + panel.start] = intColor(c);
       // pixelData[i] = utils.rgb2Int(buffer[offset] * 255, 0, 0)
     }
   };

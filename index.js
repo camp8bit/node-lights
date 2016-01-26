@@ -244,6 +244,7 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
 
   if (message.address === addresses.hue) {
     state.hue = message.args[0].value;
+    state.color = Color().hsv(Math.floor(state.hue * 255), 255, 255);
   }
 
   if (message.address === addresses.brightness) {
