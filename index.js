@@ -17,11 +17,11 @@ if (process.getuid() === 0) {
 }
 
 var addresses = {
-  tapBeat: '/toggleA_1',
-  mode: '/2/push14', // 1/mode',
-  xyPad: '/1/xypad',
-  hue: '/3/xyM_r',
-  modeSlider: '/3/xyM_l'
+  tap: '/tap',
+  mode: '/modes',
+  hue: '/hue',
+  brightness: '/brightness',
+  all: '/all'
 };
 
 var Panel = require('./panel');
@@ -82,6 +82,8 @@ function State () {
   this.mode = 0;
   this.hue = 0;
   this.brightness = 1.0;
+  this.all = false;
+  this.randomMode = 0;
 
   this.lastBeat = 0;
   this.beat = 0;
@@ -106,7 +108,7 @@ State.prototype.tap = function () {
     // console.log(this.tapCount);
 
     var secondsPerBeat = (this.lastTap - this.firstTap) / parseFloat(this.tapCount);
-    this.bpm = 1.0 / (secondsPerBeat / 60.0);
+    this.bpm = Math.round(1.0 / (secondsPerBeat / 60.0));
     console.log(this.bpm);
 
     this.barChanged();
@@ -118,7 +120,15 @@ State.prototype.nextMode = function () {
 };
 
 State.prototype.getModeName = function () {
-  return Panel.modes[this.mode];
+  var m;
+
+  if (this.mode === 0) {
+    m = this.randomMode;
+  } else {
+    m = this.mode;
+  }
+
+  return Panel.modes[m] || 'pulseUp';
 };
 
 State.prototype.randomColor = function () {
@@ -136,6 +146,7 @@ State.prototype.beatChanged = function () {
 State.prototype.barChanged = function () {
   var i = Math.min(beatPatterns.length - 1, Math.floor(Math.random() * beatPatterns.length));
   this.beatPattern = beatPatterns[i];
+  this.randomMode = Math.floor(Math.random() * Panel.modes.length);
   console.log('bar changed');
 };
 
@@ -225,53 +236,29 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
     return;
   }
 
-  // console.log(JSON.stringify(message));
-
   var push = message.args && message.args[0] && message.args[0].value === 1;
 
-  if (message.address === addresses.tapBeat) {
+  if (push && (message.address === addresses.tap)) {
     state.tap();
   }
 
-  if (message.address === addresses.xyPad) {
-    state.x = message.args[0].value;
-    state.y = message.args[1].value;
-  }
-
-  if (push && (message.address === addresses.mode)) {
-    state.nextMode();
-    // state.mode = (state.mode + 1) % modes.length;
-  }
-
-  //if (message.address === addresses.modeSlider) {
-  //    state.mode = Math.floor((Panel.modes.length - 1) * message.args[1].value);
-  //}
-
-  if (message.address.match('/3/multipushM')) {
-    var y = parseInt(message.address.split('/')[3], 10) - 1;
-    var x = parseInt(message.address.split('/')[4], 10) - 1;
-    state.mode = x + y * 4;
-
-    console.log(state.mode);
-
-    if (state.mode > Panel.modes.length - 1) {
-      state.mode = Panel.modes.length - 1;
-    }
+  if (message.address === addresses.all) {
+    state.all = message.args[0].value === 1;
   }
 
   if (message.address === addresses.hue) {
-    state.hue = message.args[1].value;
+    state.hue = message.args[0].value;
+  }
+
+  if (message.address === addresses.brightness) {
     state.brightness = message.args[0].value;
   }
 
-  if (message.address.match('/2/stepSequencer')) {
+  if ((push) && (message.address.match('/modes'))) {
+    var y = message.address.split('/')[2] - 1;
     var x = message.address.split('/')[3] - 1;
-    // var y = message.address.split('/')[4] - 1;
-    var v = message.args[0].value;
-
-    console.log(x, v);
-
-    // pattern[x] = v ? Color('#ff0000') : Color('#000000');
+    var i = y * 3 + x;
+    state.mode = i;
   }
 });
 

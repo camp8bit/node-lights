@@ -22,7 +22,7 @@ function Panel (pixelData, start, stop, inverted) {
   this.fire = Fire(this);
 }
 
-Panel.modes = 'fire wipeUp wipeDown wipeIn wipeOut pulseUp pulseDown strobe'.split(' ');
+Panel.modes = 'random fire wipeUp wipeDown wipeIn wipeOut pulseUp pulseDown strobe'.split(' ');
 
 Panel.prototype.on = function (beat, step) {
   for (var i = this.start; i < this.end; i++) {
@@ -60,6 +60,11 @@ Panel.prototype.fill = function (a, b, color) {
   for (var i = a + this.start; i < b + this.start; i++) {
     this.pixelData[i] = c;
   }
+};
+
+Panel.prototype.random = function (beat, step) {
+  var length = this.length / config.stepsPerBeat * step;
+  this.fill(0, length, this.color);
 };
 
 Panel.prototype.wipeUp = function (beat, step) {
