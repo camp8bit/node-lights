@@ -18,11 +18,14 @@ function Panel (pixelData, start, stop, inverted) {
   this.color = Color('red');
   this.inverted = inverted;
   this.strobeCounter = 0;
+  this.rainbowCounter = 0;
 
-  this.fire = Fire(this);
+  this.fire = Fire(this, ['#ffffff', '#ffff00', '#ff0000', '#000000', '#000000']);
+  this.ocean = Fire(this, ['#ffffff', '#00ffff', '#0033ff', '#0000aa', '#000055']);
+  this.forest = Fire(this, ['#aaffaa', '#33ffcc', '#00ff00', '#000000', '#007700']);
 }
 
-Panel.modes = 'random fire wipeUp wipeDown wipeIn wipeOut pulseUp pulseDown strobe'.split(' ');
+Panel.modes = 'random fire ocean forest rainbow wipeUp wipeDown wipeIn wipeOut pulseUp pulseDown strobe'.split(' ');
 
 Panel.prototype.on = function (beat, step) {
   for (var i = this.start; i < this.end; i++) {
@@ -65,6 +68,28 @@ Panel.prototype.fill = function (a, b, color) {
 Panel.prototype.random = function (beat, step) {
   var length = this.length / config.stepsPerBeat * step;
   this.fill(0, length, this.color);
+};
+
+Panel.prototype.rainbow = function (beat, step) {
+  this.rainbowCounter++;
+
+  function rgb2Int(r, g, b) {
+    r *= config.globalBrightness;
+    g *= config.globalBrightness;
+    b *= config.globalBrightness;
+    return ((r & 0xff) << 16) + ((g & 0xff) << 8) + (b & 0xff);
+  }
+
+  function colorwheel(pos) {
+    pos = 255 - pos;
+    if (pos < 85) { return rgb2Int(255 - pos * 3, 0, pos * 3); }
+    else if (pos < 170) { pos -= 85; return rgb2Int(0, pos * 3, 255 - pos * 3); }
+    else { pos -= 170; return rgb2Int(pos * 3, 255 - pos * 3, 0); }
+  }  
+
+  for (var i = this.start; i < this.stop + 1; i++) {
+    this.pixelData[i] = colorwheel((i + this.rainbowCounter) % 255);
+  }
 };
 
 Panel.prototype.wipeUp = function (beat, step) {

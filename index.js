@@ -27,11 +27,11 @@ var addresses = {
 var Panel = require('./panel');
 var config = require('./config');
 
-var NUM_LEDS = parseInt(process.argv[2], 10) || (59 + 59 + 25 + 25); // 60 * 5
+var PANEL_LENGTH = 44;
+
+var NUM_LEDS = parseInt(process.argv[2], 10) || (PANEL_LENGTH * 4); // 60 * 5
 var pixelData = new Uint32Array(NUM_LEDS);
 var inport;
-
-var PANEL_LENGTH = 44;
 
 // Patterns of beams to turn on.  It's a bitmask:
 // Bits 1-4 (least-significant) each reference a beam
@@ -79,7 +79,7 @@ function State () {
   this.bpm = 120;
 
   this.beatPattern = beatPatterns[0];
-  this.mode = 0;
+  this.mode = 1;
   this.hue = 0;
   this.brightness = 1.0;
   this.all = false;
@@ -141,7 +141,7 @@ State.prototype.beatChanged = function () {
 State.prototype.barChanged = function () {
   var i = Math.min(beatPatterns.length - 1, Math.floor(Math.random() * beatPatterns.length));
   this.beatPattern = beatPatterns[i];
-  this.randomMode = Math.floor(Math.random() * Panel.modes.length);
+  this.randomMode = Math.floor(Math.random() * 6) + 5;
   this.color = this.randomColor();
   console.log('bar changed');
 };

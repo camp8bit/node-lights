@@ -1,10 +1,10 @@
 var utils = require('../utilities');
 var Gradient = require('gradient/lib/gradient.js');
 
-module.exports = function (panel) {
+module.exports = function (panel, colors) {
   var h = panel.length;
   var buffer = new Array(panel.length);
-  var gradient = Gradient('#ffffff', '#ffff00', '#ff0000', '#000000', '#000000', panel.length);
+  var gradient = Gradient(colors, panel.length);
   var palette = gradient.toArray().map(function (c) {
     return utils.intColor(c);
   }).reverse();
