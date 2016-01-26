@@ -79,11 +79,11 @@ function State () {
   this.bpm = 120;
 
   this.beatPattern = beatPatterns[0];
-  this.mode = 1;
+  this.mode = 0;
   this.hue = 0;
   this.brightness = 1.0;
   this.all = false;
-  this.randomMode = 0;
+  this.randomMode = 5;
 
   this.lastBeat = 0;
   this.beat = 0;
@@ -103,10 +103,6 @@ State.prototype.tap = function () {
   }
 
   if (this.tapCount > 1) {
-    // console.log(this.firstTap);
-    // console.log(this.lastTap);
-    // console.log(this.tapCount);
-
     var secondsPerBeat = (this.lastTap - this.firstTap) / parseFloat(this.tapCount);
     this.bpm = Math.round(1.0 / (secondsPerBeat / 60.0));
     console.log(this.bpm);
@@ -148,7 +144,7 @@ State.prototype.barChanged = function () {
 
 State.prototype.update = function (t) {
   var dT = t - this.lastTap;
-  var dBeats = dT / (60 / this.bpm);
+  var dBeats = dT / (60.0 / this.bpm);
   var beat = dBeats % config.beatsPerBar;
   this.step = Math.floor(beat * config.stepsPerBeat) % config.stepsPerBeat;
   beat = Math.floor(beat);
