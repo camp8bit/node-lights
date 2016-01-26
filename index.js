@@ -1,7 +1,7 @@
 var udp = require('dgram');
 var osc = require('osc-min');
-var colorwheel = require('./colorwheel');
 var Color = require('color');
+var config = require('./config');
 var ws281x;
 
 if (process.getuid() === 0) {
@@ -132,21 +132,17 @@ State.prototype.getModeName = function () {
 };
 
 State.prototype.randomColor = function () {
-  return colorwheel(Math.floor(Math.random() * 255));
+  return Color().hsv(Math.floor(Math.random () * 255), 255, 255);
 };
 
 State.prototype.beatChanged = function () {
-  var c = this.randomColor();
-
-  this.panels.forEach(function (p) {
-    p.color = c;
-  });
 };
 
 State.prototype.barChanged = function () {
   var i = Math.min(beatPatterns.length - 1, Math.floor(Math.random() * beatPatterns.length));
   this.beatPattern = beatPatterns[i];
   this.randomMode = Math.floor(Math.random() * Panel.modes.length);
+  this.color = this.randomColor();
   console.log('bar changed');
 };
 
@@ -172,15 +168,16 @@ State.prototype.getActivePanels = function () {
   var self = this;
   var result = [];
   var beatPattern = this.beatPattern[this.beat].slice(2, this.panels.length + 2).split('');
+  var i;
 
-  if (this.getModeName() === 'strobe') {
-    for (var i = 0; i < this.panels.length; i++) {
+  if (this.all) {
+    for (i = 0; i < this.panels.length; i++) {
       result.push(self.panels[i]);
     }
     return result;
   }
 
-  for (var i = 0; i < this.panels.length; i++) {
+  for (i = 0; i < this.panels.length; i++) {
     if (beatPattern[i] === '1') {
       result.push(self.panels[i]);
     }
@@ -205,12 +202,11 @@ setInterval(function () {
 
   state.panels.forEach(function (panel) {
     panel.clear();
-    panel.color = Color().hsv(state.hue * 255, 255, state.brightness * 255);
   });
 
-  try{
+  try {
     state.getActivePanels().forEach(function (panel) {
-
+      panel.color = state.color;
       panel[state.getModeName()].apply(panel, [state.beat, state.step]);
 
       if (panel.inverted) {
@@ -252,6 +248,7 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
 
   if (message.address === addresses.brightness) {
     state.brightness = message.args[0].value;
+    config.globalBrightness = state.brightness;
   }
 
   if ((push) && (message.address.match('/modes'))) {
