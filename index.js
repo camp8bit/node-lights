@@ -79,7 +79,7 @@ function State () {
   this.bpm = 120;
 
   this.beatPattern = beatPatterns[0];
-  this.mode = 3;
+  this.mode = 0;
   this.hue = 0;
   this.brightness = 1.0;
 
@@ -162,6 +162,13 @@ State.prototype.getActivePanels = function () {
   var result = [];
   var beatPattern = this.beatPattern[this.beat].slice(2, this.panels.length + 2).split('');
 
+  if (this.getModeName() === 'strobe') {
+    for (var i = 0; i < this.panels.length; i++) {
+      result.push(self.panels[i]);
+    }
+    return result;
+  }
+
   for (var i = 0; i < this.panels.length; i++) {
     if (beatPattern[i] === '1') {
       result.push(self.panels[i]);
@@ -174,10 +181,10 @@ State.prototype.getActivePanels = function () {
 var state = new State();
 
 state.panels = [
-  new Panel(pixelData, PANEL_LENGTH * 0, PANEL_LENGTH * 1 - 1),
-  new Panel(pixelData, PANEL_LENGTH * 1, PANEL_LENGTH * 2 - 1),
-  new Panel(pixelData, PANEL_LENGTH * 2, PANEL_LENGTH * 3 - 1),
-  new Panel(pixelData, PANEL_LENGTH * 3, PANEL_LENGTH * 4 - 1)
+  new Panel(pixelData, PANEL_LENGTH * 0, PANEL_LENGTH * 1 - 1, true),
+  new Panel(pixelData, PANEL_LENGTH * 1, PANEL_LENGTH * 2 - 1, false),
+  new Panel(pixelData, PANEL_LENGTH * 2, PANEL_LENGTH * 3 - 1, true),
+  new Panel(pixelData, PANEL_LENGTH * 3, PANEL_LENGTH * 4 - 1, false)
 ];
 
 setInterval(function () {
@@ -187,16 +194,26 @@ setInterval(function () {
 
   state.panels.forEach(function (panel) {
     panel.clear();
-
     panel.color = Color().hsv(state.hue * 255, 255, state.brightness * 255);
   });
 
-  state.getActivePanels().forEach(function (panel) {
-    panel[state.getModeName()].apply(panel, [state.beat, state.step]);
-  });
+  try{
+    state.getActivePanels().forEach(function (panel) {
+
+      panel[state.getModeName()].apply(panel, [state.beat, state.step]);
+
+      if (panel.inverted) {
+        panel.flip();
+      }
+    });
+  } catch (e) {
+    console.log(state.getModeName());
+    console.log(state.mode);
+    console.error(e);
+  }
 
   ws281x.render(pixelData);
-}, 20);
+}, 10);
 
 var sock = udp.createSocket('udp4', function (msg, rinfo) {
   var message;
@@ -208,7 +225,7 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
     return;
   }
 
-  console.log(JSON.stringify(message));
+  // console.log(JSON.stringify(message));
 
   var push = message.args && message.args[0] && message.args[0].value === 1;
 
@@ -226,8 +243,20 @@ var sock = udp.createSocket('udp4', function (msg, rinfo) {
     // state.mode = (state.mode + 1) % modes.length;
   }
 
-  if (message.address === addresses.modeSlider) {
-    state.mode = Math.floor(Panel.modes.length * message.args[1].value);
+  //if (message.address === addresses.modeSlider) {
+  //    state.mode = Math.floor((Panel.modes.length - 1) * message.args[1].value);
+  //}
+
+  if (message.address.match('/3/multipushM')) {
+    var y = parseInt(message.address.split('/')[3], 10) - 1;
+    var x = parseInt(message.address.split('/')[4], 10) - 1;
+    state.mode = x + y * 4;
+
+    console.log(state.mode);
+
+    if (state.mode > Panel.modes.length - 1) {
+      state.mode = Panel.modes.length - 1;
+    }
   }
 
   if (message.address === addresses.hue) {

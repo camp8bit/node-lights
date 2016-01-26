@@ -6,7 +6,7 @@ var colorToInt = require('./color-to-int');
 
 var PULSE_LENGTH = 10;
 
-function Panel (pixelData, start, stop) {
+function Panel (pixelData, start, stop, inverted) {
   if (stop < start) {
     throw new Error('Stop before start');
   }
@@ -16,11 +16,13 @@ function Panel (pixelData, start, stop) {
   this.length = stop - start + 1;
   this.pixelData = pixelData;
   this.color = Color('red');
+  this.inverted = inverted;
+  this.strobeCounter = 0;
 
   this.fire = Fire(this);
 }
 
-Panel.modes = 'fire wipeUp wipeDown wipeIn wipeOut pulseUp pulseDown'.split(' ');
+Panel.modes = 'fire wipeUp wipeDown wipeIn wipeOut pulseUp pulseDown strobe'.split(' ');
 
 Panel.prototype.on = function (beat, step) {
   for (var i = this.start; i < this.end; i++) {
@@ -30,6 +32,18 @@ Panel.prototype.on = function (beat, step) {
 
 Panel.prototype.clear = function () {
   this.fill(0, this.length, Color('black'));
+};
+
+Panel.prototype.flip = function () {
+  var i;
+
+  for (i = 0;i < this.length / 2;i++) {
+    var a = this.pixelData[i + this.start] + 0;
+    var b = this.pixelData[this.stop - i] + 0;
+
+    this.pixelData[i + this.start] = b;
+    this.pixelData[this.stop - i] = a;
+  }
 };
 
 Panel.prototype.fill = function (a, b, color) {
@@ -78,9 +92,12 @@ Panel.prototype.pulseDown = function (beat, step) {
   this.fill(length, length + PULSE_LENGTH, this.color);
 };
 
-Panel.prototype.fire = function (beat, step) {
-  var length = this.length / config.stepsPerBeat * (config.stepsPerBeat - step);
-  this.fill(length, length + PULSE_LENGTH, this.color);
+Panel.prototype.strobe = function (beat, step) {
+  if (this.strobeCounter % 4 === 0) {
+    this.fill(0, this.length, Color('white'));
+  }
+
+  this.strobeCounter++;
 };
 
 module.exports = Panel;
